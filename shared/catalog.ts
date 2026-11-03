@@ -13,6 +13,7 @@ export interface SupermodelArchetype {
   id: string;
   name: string;
   description: string;
+  aliases?: string[];
   dna: {
     ethnicity: string;
     skin_tone: string;
@@ -56,8 +57,9 @@ export const SUPERMODEL_ARCHETYPES: SupermodelArchetype[] = [
     },
   },
   {
-    id: 'LINA-02',
-    name: '02) LINA-02 · Nórdica Báltica',
+    id: 'ISA-02',
+    name: '02) ISA-02 · Nórdica Báltica',
+    aliases: ['LINA-02'],
     description: 'Nórdica-báltica minimalista, piel porcelana neutra, ojos gris-azulados, cabello rubio ceniza.',
     dna: {
       ethnicity: 'Nordic-Baltic',
@@ -79,8 +81,9 @@ export const SUPERMODEL_ARCHETYPES: SupermodelArchetype[] = [
     },
   },
   {
-    id: 'SORA-03',
-    name: '03) SORA-03 · Asiática Oriental',
+    id: 'ALMA-03',
+    name: '03) ALMA-03 · Asiática Oriental',
+    aliases: ['SORA-03'],
     description: 'Asiática oriental contemporánea, piel marfil luminosa, corte bob asimétrico negro azabache.',
     dna: {
       ethnicity: 'East Asian',
@@ -102,8 +105,9 @@ export const SUPERMODEL_ARCHETYPES: SupermodelArchetype[] = [
     },
   },
   {
-    id: 'VALE-04',
-    name: '04) VALE-04 · Latina Caribeña',
+    id: 'BRISA-04',
+    name: '04) BRISA-04 · Latina Caribeña',
+    aliases: ['VALE-04'],
     description: 'Afro-latina caribeña, piel bronce dorada cálida, rizos definidos con volumen, rasgos expresivos.',
     dna: {
       ethnicity: 'Afro-Latina Caribbean',
@@ -125,8 +129,9 @@ export const SUPERMODEL_ARCHETYPES: SupermodelArchetype[] = [
     },
   },
   {
-    id: 'NAYA-05',
-    name: '05) NAYA-05 · Franco-Marroquí',
+    id: 'ELIA-05',
+    name: '05) ELIA-05 · Franco-Marroquí',
+    aliases: ['NAYA-05'],
     description: 'Mediterránea franco-marroquí, piel oliva dorada, ojos verdes almendrados, ondas suaves.',
     dna: {
       ethnicity: 'Mediterranean North-African',
@@ -148,8 +153,9 @@ export const SUPERMODEL_ARCHETYPES: SupermodelArchetype[] = [
     },
   },
   {
-    id: 'MIRA-06',
-    name: '06) MIRA-06 · Indo-Británica',
+    id: 'NARA-06',
+    name: '06) NARA-06 · Indo-Británica',
+    aliases: ['MIRA-06'],
     description: 'Surasiática contemporánea, piel caramelo cálida, ojos oscuros profundos, melena negra larga.',
     dna: {
       ethnicity: 'South Asian',
@@ -171,8 +177,9 @@ export const SUPERMODEL_ARCHETYPES: SupermodelArchetype[] = [
     },
   },
   {
-    id: 'TESSA-07',
-    name: '07) TESSA-07 · Celta Pelirroja',
+    id: 'MAREA-07',
+    name: '07) MAREA-07 · Celta Pelirroja',
+    aliases: ['TESSA-07'],
     description: 'Celta contemporánea, piel clara con pecas naturales sutiles, cabello cobrizo, ojos verdes.',
     dna: {
       ethnicity: 'Celtic Irish',
@@ -194,8 +201,9 @@ export const SUPERMODEL_ARCHETYPES: SupermodelArchetype[] = [
     },
   },
   {
-    id: 'INES-08',
-    name: '08) INES-08 · Ibérica Clásica',
+    id: 'LIA-08',
+    name: '08) LIA-08 · Ibérica Clásica',
+    aliases: ['INES-08'],
     description: 'Ibérica de alta costura, estructura ósea marcada, piel beige neutra, cabello castaño recogido.',
     dna: {
       ethnicity: 'Southern European Iberian',
@@ -217,8 +225,9 @@ export const SUPERMODEL_ARCHETYPES: SupermodelArchetype[] = [
     },
   },
   {
-    id: 'DARIA-09',
-    name: '09) DARIA-09 · Eslava Editorial',
+    id: 'VEGA-09',
+    name: '09) VEGA-09 · Eslava Editorial',
+    aliases: ['DARIA-09'],
     description: 'Europa del Este, pómulos esculturales, cabello rubio platino corto pixie, mirada magnética.',
     dna: {
       ethnicity: 'Eastern European Slavic',
@@ -286,6 +295,14 @@ export const SUPERMODEL_ARCHETYPES: SupermodelArchetype[] = [
     },
   },
 ];
+
+export function getArchetype(id: string): SupermodelArchetype | undefined {
+  if (!id) return undefined;
+  const clean = id.trim().toUpperCase();
+  return SUPERMODEL_ARCHETYPES.find(
+    (a) => a.id.toUpperCase() === clean || (a.aliases && a.aliases.some((al) => al.toUpperCase() === clean)),
+  );
+}
 
 export const EXPRESSIONS_PANEL_LIST = [
   '1. Curiosidad (cabeza ligeramente inclinada, cejas sutilmente levantadas)',
@@ -614,6 +631,8 @@ export const BACKGROUND_PRESETS: BackgroundPreset[] = [
   { id: 'outdoor_urban_street', name: 'Exterior Calle Urbana Chic', category: 'outdoor', hexPreview: '#CBD5E1', promptDirective: 'Clean European limestone city street out-of-focus background, neutral daylight.' },
   { id: 'outdoor_mediterranean_wall', name: 'Exterior Muro Mediterráneo', category: 'outdoor', hexPreview: '#F5EBE0', promptDirective: 'Sun-washed whitewashed Mediterranean courtyard wall, soft natural shadows.' },
 ];
+
+export const STUDIO_BACKGROUND_PRESETS = BACKGROUND_PRESETS;
 
 export const COMMERCIAL_FASHION_CATALOG_PREAMBLE = `CONTEXT: Professional commercial fashion e-commerce catalog production and technical garment visualization.
 All garments (including bodysuits, swimwear, activewear, intimates, or tailored apparel) are presented strictly in a respectful, non-sensual, high-fashion retail catalog context on an adult studio model.`;

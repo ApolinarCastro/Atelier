@@ -4,7 +4,8 @@ export type Stage =
 export type AssetType =
   | 'garment_raw' | 'garment_cut' | 'ghost' | 'view_front' | 'view_left'
   | 'view_right' | 'view_back' | 'tryon' | 'retouched' | 'composed'
-  | 'model_sheet' | 'model_portrait' | 'model_expressions' | 'size_guide';
+  | 'model_sheet' | 'model_portrait' | 'model_expressions' | 'size_guide'
+  | 'background_custom';
 
 export interface Asset {
   id: string;
@@ -32,7 +33,7 @@ export interface ReferenceManifestEntry {
   order: number;
   imageIndex: number;
   assetId: string;
-  role: 'identity_sheet' | 'garment_original' | 'garment_cut_support' | 'previous_render_support' | 'pose_source_support';
+  role: 'identity_sheet' | 'garment_original' | 'garment_cut_support' | 'previous_render_support' | 'pose_source_support' | 'background_support' | 'target_support';
   type: AssetType;
   sha256: string;
   variantId: string | null;
@@ -196,6 +197,28 @@ export interface Job {
   cost_usd?: number;
   started_at?: string;
   ended_at?: string;
+  created_at: string;
+}
+
+export interface BatchJobItem {
+  sku: string;
+  productId: string;
+  variantId?: string | null;
+  mode: string;
+  jobId?: string;
+  status: 'pending' | 'running' | 'done' | 'failed' | 'blocked';
+  error?: string;
+  assetId?: string;
+}
+
+export interface BatchJobProgress {
+  batchId: string;
+  projectId: string;
+  total: number;
+  completed: number;
+  failed: number;
+  blocked: number;
+  items: BatchJobItem[];
   created_at: string;
 }
 

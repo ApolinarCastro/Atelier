@@ -107,15 +107,49 @@ export function validateQA(data: any, needsIdentity: boolean): QAResult & { cont
   return data;
 }
 
-export function passesQA(data: ReturnType<typeof validateQA>, needsIdentity: boolean) {
+export function passesQA(data: ReturnType<typeof validateQA>, needsIdentity: boolean, candidateType?: string) {
   const c = data.controls;
-  return data.overallStatus === 'PASS' && !data.hasCriticalMismatch &&
-    attributes.every(key => ['MATCH', 'POSSIBLE_MISMATCH'].includes(data.attributes[key])) &&
-    (!needsIdentity || c.controlA_identity.passed) &&
-    c.controlB_prohibitedExclusion.passed && !c.controlB_prohibitedExclusion.violations.length &&
-    flags.every(key => c.controlB_prohibitedExclusion[key as keyof typeof c.controlB_prohibitedExclusion] === true) &&
-    c.controlC_textileFidelity.passed && c.controlC_textileFidelity.silhouetteIntact &&
-    c.controlD_compositionPose.passed && c.controlD_compositionPose.posePreserved &&
-    c.controlE_technicalQuality.passed;
+  if (data.overallStatus !== 'PASS' || data.hasCriticalMismatch) return false;
+  if (needsIdentity && !c.controlA_identity.passed) return false;
+  if (!c.controlB_prohibitedExclusion.passed || c.controlB_prohibitedExclusion.violations.length > 0) return false;
+  for (const key of flags) {
+    if (c.controlB_prohibitedExclusion[key as keyof typeof c.controlB_prohibitedExclusion] !== true) return false;
+  }
+  if (!c.controlC_textileFidelity.passed || !c.controlC_textileFidelity.silhouetteIntact) return false;
+  if (!c.controlD_compositionPose.passed || !c.controlD_compositionPose.posePreserved) return false;
+  if (!c.controlE_technicalQuality.passed) return false;
+  if (c.suggestedAction !== 'APPROVE') return false;
+
+  // Atributos estructurales obligatorios que siempre deben verificarse (MATCH o POSSIBLE_MISMATCH)
+  const coreAttrs = ['color', 'pattern', 'silhouette', 'texture'];
+  for (const key of coreAttrs) {
+    const val = data.attributes[key];
+    if (val !== 'MATCH' && val !== 'POSSIBLE_MISMATCH') {
+      return false;
+    }
+  }
+
+  // Atributos dependientes de vista y ángulo (R04)
+  const isBackView = candidateType === 'view_back' || candidateType?.toLowerCase().includes('back');
+  const viewSensitiveAttrs = ['lapels', 'buttons', 'pockets', 'neckline'];
+
+  for (const key of attributes) {
+    const val = data.attributes[key];
+    if (val === 'MISMATCH') return false;
+    if (val === 'NOT_VISIBLE') {
+      if (isBackView && viewSensitiveAttrs.includes(key)) {
+        continue;
+      }
+      if (viewSensitiveAttrs.includes(key) || key === 'sleeves' || key === 'hem') {
+        continue;
+      }
+      return false;
+    }
+    if (val !== 'MATCH' && val !== 'POSSIBLE_MISMATCH') {
+      return false;
+    }
+  }
+
+  return true;
 }
 

@@ -96,6 +96,34 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, context }),
     }).then(J),
+  // F04: Biblioteca de identidades y reutilización
+  getModelsLibrary: () => fetch('/api/models/library').then(J),
+  importModel: (projectId: string, sourceModelId: string) =>
+    fetch(`/api/projects/${projectId}/models/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceModelId }),
+    }).then(J),
+  // F01: Fondos personalizados
+  getBackgrounds: () => fetch('/api/backgrounds').then(J),
+  uploadBackground: (projectId: string, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return fetch(`/api/projects/${projectId}/backgrounds`, { method: 'POST', body: fd }).then(J);
+  },
+  // F02: Historial de versiones y comparador
+  getAssetVersions: (assetId: string) => fetch(`/api/assets/${assetId}/versions`).then(J),
+  // F03: Lotes SKU
+  createBatch: (projectId: string, body: any) =>
+    fetch(`/api/projects/${projectId}/batches`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(J),
+  getBatch: (projectId: string, batchId: string) =>
+    fetch(`/api/projects/${projectId}/batches/${batchId}`).then(J),
+  cancelBatch: (batchId: string) =>
+    fetch(`/api/batches/${batchId}/cancel`, { method: 'POST' }).then(J),
 };
 export const fileUrl = (id: string) => `/api/assets/${id}/file`;
 export const exportZipUrl = (id: string) => `/api/exports/${id}/zip`;

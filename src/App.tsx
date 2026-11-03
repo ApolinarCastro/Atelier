@@ -284,6 +284,7 @@ function StageCasting({ state, run, busy, projectId }: any) {
   const [includeExpr, setIncludeExpr] = useState(true);
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [uploadModelName, setUploadModelName] = useState('Avatar Foto Real');
+  const [showLibraryModal, setShowLibraryModal] = useState(false);
 
   const selectedArch = SUPERMODEL_ARCHETYPES.find((a) => a.id === archId);
 
@@ -386,7 +387,7 @@ function StageCasting({ state, run, busy, projectId }: any) {
             <label>Fotografía real del modelo (PNG/JPG/WEBP)</label>
             <input type="file" accept="image/*" onChange={(e) => setModelFile(e.target.files?.[0] || null)} />
           </div>
-          <div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             <button
               className="primary"
               disabled={!modelFile || !!busy}
@@ -400,9 +401,28 @@ function StageCasting({ state, run, busy, projectId }: any) {
             >
               Subir y Aprobar Foto Real
             </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => setShowLibraryModal(true)}
+              title="Reutilizar modelos ya aprobados de otros proyectos"
+            >
+              🏛️ Biblioteca Global (F04)
+            </button>
           </div>
         </div>
       </div>
+
+      {showLibraryModal && (
+        <ModelLibraryModal
+          projectId={projectId}
+          onImport={(id: string) => {
+            setShowLibraryModal(false);
+            run('Importando modelo de biblioteca', () => api.importModel(projectId, id), 'Modelo importado con éxito');
+          }}
+          onClose={() => setShowLibraryModal(false)}
+        />
+      )}
 
       <div className="card">
         <table>
@@ -761,6 +781,125 @@ function StageLock({ state, run, busy }: any) {
 }
 
 
+/* ---------------- F02 & F04 Modales: Comparador Visual Forense y Biblioteca Global ---------------- */
+function VisualComparatorModal({ asset, originalAsset, onClose }: any) {
+  const [sliderPos, setSliderPos] = useState(50);
+  const [mode, setMode] = useState<'split' | 'side'>('split');
+  const [versions, setVersions] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (asset?.id) {
+      api.getAssetVersions(asset.id).then((res: any) => {
+        if (res?.versions) setVersions(res.versions);
+      }).catch(() => {});
+    }
+  }, [asset?.id]);
+
+  const candUrl = fileUrl(asset.id);
+  const origUrl = originalAsset ? fileUrl(originalAsset.id) : (versions[1] ? fileUrl(versions[1].id) : candUrl);
+
+  return (
+    <div className="comparator-modal" onClick={onClose}>
+      <div className="comparator-box" onClick={(e) => e.stopPropagation()}>
+        <div className="comparator-header">
+          <div>
+            <strong>Comparador Visual Forense (Clone Studio V5)</strong>
+            <span className="sub" style={{ marginLeft: 12 }}>{asset.id} · {asset.type}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className={mode === 'split' ? 'primary' : ''} onClick={() => setMode('split')}>Cortina Deslizable</button>
+            <button className={mode === 'side' ? 'primary' : ''} onClick={() => setMode('side')}>Lado a Lado</button>
+            <button onClick={onClose}>Cerrar ✕</button>
+          </div>
+        </div>
+        <div className="comparator-body">
+          {mode === 'split' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+              <div className="split-slider-container">
+                <img src={origUrl} alt="Original Reference" />
+                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${sliderPos}%`, overflow: 'hidden' }}>
+                  <img src={candUrl} alt="Candidate Render" style={{ width: '600px', maxWidth: 'none' }} />
+                </div>
+                <div className="split-slider-divider" style={{ left: `${sliderPos}%` }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12, width: '100%', maxWidth: 500 }}>
+                <span className="sub">Candidato</span>
+                <input type="range" min="0" max="100" value={sliderPos} onChange={(e) => setSliderPos(+e.target.value)} style={{ flex: 1 }} />
+                <span className="sub">Referencia Original</span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', width: '100%', flexWrap: 'wrap' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div className="sub" style={{ marginBottom: 6 }}>Referencia de Origen</div>
+                <img src={origUrl} alt="Original" style={{ width: 340, height: 450, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div className="sub" style={{ marginBottom: 6 }}>Render Candidato Actual</div>
+                <img src={candUrl} alt="Candidate" style={{ width: 340, height: 450, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)' }} />
+              </div>
+            </div>
+          )}
+          {versions.length > 1 && (
+            <div style={{ width: '100%', borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+              <label>Historial de Versiones ({versions.length})</label>
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '6px 0' }}>
+                {versions.map((v) => (
+                  <div key={v.id} className="thumb" style={{ width: 85, flexShrink: 0, border: v.id === asset.id ? '2px solid var(--acc)' : '1px solid var(--line)' }}>
+                    <img src={fileUrl(v.id)} alt={v.type} style={{ height: 100 }} />
+                    <div className="cap"><span style={{ fontSize: 9 }}>{v.id.slice(0, 8)}</span></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModelLibraryModal({ projectId, onImport, onClose }: any) {
+  const [library, setLibrary] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getModelsLibrary().then((res: any) => {
+      setLibrary(res || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="comparator-modal" onClick={onClose}>
+      <div className="comparator-box" onClick={(e) => e.stopPropagation()}>
+        <div className="comparator-header">
+          <strong>Biblioteca Global de Identidades Aprobadas (F04)</strong>
+          <button onClick={onClose}>✕</button>
+        </div>
+        <div className="comparator-body">
+          {loading ? (
+            <p className="sub">Cargando identidades aprobadas...</p>
+          ) : library.length === 0 ? (
+            <p className="sub">No hay modelos aprobados disponibles en otros proyectos.</p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, width: '100%' }}>
+              {library.map((m) => (
+                <div key={m.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {m.sheet_asset_id && <img src={fileUrl(m.sheet_asset_id)} alt={m.name} style={{ width: '100%', height: 130, objectFit: 'contain', borderRadius: 6 }} />}
+                  <div style={{ fontWeight: 600 }}>{m.name}</div>
+                  <div className="sub" style={{ fontSize: 11 }}>Proyecto: {m.project_name || m.project_id}</div>
+                  <button className="primary" onClick={() => onImport(m.id)}>Reutilizar en este Proyecto</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Etapa 4: Render Master V5 + Dirección de Pose + Virtual Stylist Pro + Clone Studio ---------------- */
 function StageRender({ state, run, busy }: any) {
   const models = (state?.models || []).filter((m: any) => m.status === 'approved');
@@ -768,6 +907,9 @@ function StageRender({ state, run, busy }: any) {
   const [modelId, setModelId] = useState('');
   const [lockId, setLockId] = useState('');
   const [variantId, setVariantId] = useState('');
+  const [exactMode, setExactMode] = useState(true);
+  const [customBgFile, setCustomBgFile] = useState<File | null>(null);
+  const [comparatorAsset, setComparatorAsset] = useState<any | null>(null);
 
   // Virtual Stylist Pro
   const [stylePresetId, setStylePresetId] = useState('minimalist');
@@ -804,6 +946,7 @@ function StageRender({ state, run, busy }: any) {
 
   const activeLock = locks.find((l: any) => l.id === lockId);
   const productVariants = (state?.variants || []).filter((v: any) => v.product_id === activeLock?.product_id);
+  const customBackgrounds = (state?.assets || []).filter((a: any) => a.type === 'background_custom');
   const renders = (state?.assets || []).filter((a: any) => ['tryon', 'view_front', 'view_left', 'view_right', 'view_back', 'ghost'].includes(a.type));
   const poseGuide = POSE_SUGGESTIONS[poseCategory];
 
@@ -827,6 +970,11 @@ function StageRender({ state, run, busy }: any) {
     const targetLock = locks.find(
       (l: any) => l.product_id === activeLock.product_id && (l.variant_id || '') === (variantId || ''),
     ) || activeLock;
+
+    const isCustom = backgroundPresetId.startsWith('custom:');
+    const bgAssetId = isCustom ? backgroundPresetId.replace('custom:', '') : undefined;
+    const bgPreset = isCustom ? undefined : backgroundPresetId;
+
     return run(
       mode === 'views' ? 'Generando 4 vistas 3D' : mode === 'ghost' ? 'Generando Efecto Flotante (Ghost 3D)' : 'Generando Master Render V5',
       () => api.render(activeLock.product_id, {
@@ -834,6 +982,7 @@ function StageRender({ state, run, busy }: any) {
         lockId: targetLock.id,
         variantId: variantId || undefined,
         mode,
+        generationMode: exactMode ? 'exact' : 'creative',
         params: {
           view: 'Frontal',
           stylePresetId,
@@ -847,11 +996,48 @@ function StageRender({ state, run, busy }: any) {
           cameraAngle,
           attitude,
           posePresetId,
-          backgroundPresetId,
+          backgroundPresetId: bgPreset,
+          backgroundAssetId: bgAssetId,
           additionalPrompt: additionalPrompt.trim() || undefined,
         },
       }),
       'Render completado con asignación estricta de fuentes (Master Prompt V5)',
+    );
+  };
+
+  const runBatch = () => {
+    if (!activeLock) return run('x', async () => { throw new Error('Aprueba un lock primero'); });
+    const isCustom = backgroundPresetId.startsWith('custom:');
+    const bgAssetId = isCustom ? backgroundPresetId.replace('custom:', '') : undefined;
+    const bgPreset = isCustom ? undefined : backgroundPresetId;
+
+    const baseItem = {
+      productId: activeLock.product_id,
+      modelId,
+      lockId: activeLock.id,
+      mode: 'tryon',
+      generationMode: exactMode ? 'exact' : 'creative',
+      params: { backgroundPresetId: bgPreset, backgroundAssetId: bgAssetId },
+    };
+
+    const variantItems = productVariants.map((v: any) => {
+      const vLock = locks.find((l: any) => l.product_id === activeLock.product_id && l.variant_id === v.id);
+      return {
+        productId: activeLock.product_id,
+        modelId,
+        lockId: vLock?.id || activeLock.id,
+        variantId: v.id,
+        mode: 'tryon',
+        generationMode: exactMode ? 'exact' : 'creative',
+        params: { backgroundPresetId: bgPreset, backgroundAssetId: bgAssetId },
+      };
+    });
+
+    const items = [baseItem, ...variantItems];
+    return run(
+      `Ejecutando Batch de ${items.length} SKU`,
+      () => api.createBatch(state?.project?.id, items),
+      `Batch SKU de ${items.length} prendas procesado exitosamente`,
     );
   };
 
@@ -946,28 +1132,70 @@ function StageRender({ state, run, busy }: any) {
         )}
 
         <div className="row" style={{ marginTop: 12 }}>
-          <div style={{ flex: 1.6 }}>
+          <div style={{ flex: 1.4 }}>
             <label>Pose Esquelética 13-Ángulos (Clone Studio)</label>
             <select value={posePresetId} onChange={(e) => setPosePresetId(e.target.value)}>
               {SKELETAL_POSE_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.category})</option>)}
             </select>
           </div>
-          <div style={{ flex: 1.6 }}>
-            <label>Fondo de Estudio / Exterior (12 ambientes)</label>
+          <div style={{ flex: 1.8 }}>
+            <label>Fondo de Estudio / Exterior / Personalizado (F01)</label>
             <select value={backgroundPresetId} onChange={(e) => setBackgroundPresetId(e.target.value)}>
-              {BACKGROUND_PRESETS.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              <optgroup label="Fondos Predeterminados">
+                {BACKGROUND_PRESETS.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </optgroup>
+              {customBackgrounds.length > 0 && (
+                <optgroup label="Fondos Personalizados Subidos (F01)">
+                  {customBackgrounds.map((bg: any) => (
+                    <option key={bg.id} value={`custom:${bg.id}`}>{bg.filename || `Fondo Personalizado ${bg.id.slice(0, 8)}`}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}>
+              <input type="file" accept="image/*" onChange={(e) => setCustomBgFile(e.target.files?.[0] || null)} style={{ fontSize: 10, padding: 2 }} />
+              <button
+                type="button"
+                style={{ fontSize: 10, padding: '3px 6px', whiteSpace: 'nowrap' }}
+                disabled={!customBgFile || !!busy}
+                onClick={() => {
+                  if (!customBgFile) return;
+                  run('Subiendo fondo personalizado', async () => {
+                    const res = await api.uploadBackground(state?.project?.id, customBgFile);
+                    if (res?.asset?.id) setBackgroundPresetId(`custom:${res.asset.id}`);
+                    setCustomBgFile(null);
+                  }, 'Fondo personalizado guardado como background_custom');
+                }}
+              >
+                Subir Fondo
+              </button>
+            </div>
           </div>
-          <div style={{ flex: 2 }}>
+          <div style={{ flex: 1.8 }}>
             <label>Instrucción adicional de refinamiento (opcional)</label>
-            <input value={additionalPrompt} onChange={(e) => setAdditionalPrompt(e.target.value)} placeholder="Ej: Mangas ligeramente remangadas, botones abrochados..." />
+            <input value={additionalPrompt} onChange={(e) => setAdditionalPrompt(e.target.value)} placeholder="Ej: Mangas ligeramente remangadas..." />
+            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={exactMode} onChange={(e) => setExactMode(e.target.checked)} style={{ width: 'auto' }} />
+                Modo Exacto (R02)
+              </label>
+              {exactMode && <span className="badge-exact" title="Prohíbe cambios de rasgos faciales, peinado, tono o anatomía">MODO EXACTO ACTIVO</span>}
+            </div>
           </div>
         </div>
 
-        <div className="row" style={{ marginTop: 16 }}>
+        <div className="row" style={{ marginTop: 16, flexWrap: 'wrap', gap: 8 }}>
           <button className="primary" disabled={!!busy} onClick={() => go('tryon')}>Generar Try-On (Master V5)</button>
           <button disabled={!!busy} onClick={() => go('views')}>Generar 4 Vistas 3D (Frontal/Lat/Espalda)</button>
           <button disabled={!!busy} onClick={() => go('ghost')}>Efecto Flotante (Ghost Mannequin 3D)</button>
+          <button
+            className="ghost"
+            disabled={!!busy}
+            onClick={runBatch}
+            title="Genera en paralelo o serie el producto base y todas sus variantes registradas"
+          >
+            ⚡ Render Batch SKU Completo (F03)
+          </button>
         </div>
       </div>
 
@@ -977,9 +1205,25 @@ function StageRender({ state, run, busy }: any) {
             <img src={fileUrl(a.id)} alt={a.type} />
             <div className="cap"><span>{a.type.replace('view_', 'vista ')}</span>
               <span className={`badge ${a.approved ? 'ok' : ''}`}>{a.approved ? 'aprobado' : a.stage}</span></div>
+            <div style={{ padding: '4px 6px' }}>
+              <button
+                style={{ width: '100%', fontSize: 10, padding: '3px 4px' }}
+                onClick={() => setComparatorAsset(a)}
+              >
+                🔍 Comparar Forense (F02)
+              </button>
+            </div>
           </div>
         ))}
       </div>
+
+      {comparatorAsset && (
+        <VisualComparatorModal
+          asset={comparatorAsset}
+          originalAsset={(state?.assets || []).find((x: any) => x.type === 'garment_raw' && x.product_id === activeLock?.product_id)}
+          onClose={() => setComparatorAsset(null)}
+        />
+      )}
     </>
   );
 }
@@ -988,6 +1232,7 @@ function StageRender({ state, run, busy }: any) {
 function StageQA({ state, run, busy }: any) {
   const pending = (state?.assets || []).filter((a: any) => ['tryon', 'ghost', 'view_front', 'view_left', 'view_right', 'view_back'].includes(a.type));
   const [retryMap, setRetryMap] = useState<Record<string, string>>({});
+  const [comparatorAsset, setComparatorAsset] = useState<any | null>(null);
 
   return (
     <>
@@ -1021,6 +1266,9 @@ function StageQA({ state, run, busy }: any) {
               <div style={{ padding: '0 8px 8px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button style={{ padding: '5px 9px', fontSize: 11 }} disabled={!!busy}
                   onClick={() => run('Auditando 5 Controles QA', () => api.qa(a.id), 'Auditoría QA de 5 controles completada')}>Auditar QA</button>
+                <button style={{ padding: '5px 9px', fontSize: 11 }} onClick={() => setComparatorAsset(a)}>
+                  🔍 Comparador
+                </button>
                 {qa?.overallStatus === 'PASS' && !a.approved &&
                   <button className="primary" style={{ padding: '5px 9px', fontSize: 11 }} disabled={!!busy}
                     onClick={() => run('Aprobando', () => api.approveAsset(a.id), 'Asset aprobado para catálogo')}>Aprobar</button>}
@@ -1045,6 +1293,14 @@ function StageQA({ state, run, busy }: any) {
           );
         })}
       </div>
+
+      {comparatorAsset && (
+        <VisualComparatorModal
+          asset={comparatorAsset}
+          originalAsset={(state?.assets || []).find((x: any) => x.type === 'garment_raw' && x.product_id === comparatorAsset.product_id)}
+          onClose={() => setComparatorAsset(null)}
+        />
+      )}
     </>
   );
 }

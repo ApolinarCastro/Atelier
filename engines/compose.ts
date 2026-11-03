@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import sharp from 'sharp';
+import sharp, { type OverlayOptions } from 'sharp';
 import { run, now } from '../server/db.ts';
 import { register } from '../server/queue.ts';
 import { requireApprovedAsset, GateError } from '../server/gates.ts';
@@ -148,7 +148,7 @@ register('compose.catalog', async (p) => {
   const innerW = W - safeMargin * 2;
   const innerH = H - safeMargin * 2;
 
-  const layers: sharp.OverlayOptions[] = [];
+  const layers: OverlayOptions[] = [];
   const landmarksReport: Record<string, SubjectLandmarks> = {};
 
   if (hcTemplate) {
@@ -169,13 +169,21 @@ register('compose.catalog', async (p) => {
       const innerCellW = Math.max(32, cellW - safeBorder * 2);
       const innerCellH = Math.max(32, cellH - safeBorder * 2);
 
+      // Alineación anatómica editorial por landmarks (R05)
+      let positionOption: any = 'north';
+      if (sharpFit === 'cover') {
+        positionOption = landmarks.eyeLineY < 0.22 ? 'top' : landmarks.torsoCenterY > 0.5 ? 'centre' : 'attention';
+      } else {
+        positionOption = landmarks.headTopY < 0.12 ? 'north' : 'centre';
+      }
+
       let imgBuf = await sharp(snapshots.get(a.id)!)
         .resize({
           width: innerCellW,
           height: innerCellH,
           fit: sharpFit,
           background: safeBg,
-          position: sharpFit === 'cover' ? 'attention' : 'north',
+          position: positionOption,
         })
         .toBuffer();
 
@@ -209,13 +217,16 @@ register('compose.catalog', async (p) => {
       const innerCellW = Math.max(32, cellW - safeBorder * 2);
       const innerCellH = Math.max(32, cellH - safeBorder * 2);
 
+      const landmarks = landmarksReport[a.id];
+      const positionOption: any = landmarks.headTopY < 0.12 ? 'north' : 'centre';
+
       let buf = await sharp(snapshots.get(a.id)!)
         .resize({
           width: innerCellW,
           height: innerCellH,
           fit: sharpFit,
           background: safeBg,
-          position: 'north',
+          position: positionOption,
         })
         .toBuffer();
 

@@ -4,7 +4,7 @@ import { register } from '../server/queue.ts';
 import { generateImage } from '../server/provider.ts';
 import { castingPrompt } from './prompts.ts';
 import { createAsset, assetImage } from './assets.ts';
-import { SUPERMODEL_ARCHETYPES } from '../shared/catalog.ts';
+import { SUPERMODEL_ARCHETYPES, getArchetype } from '../shared/catalog.ts';
 import type { ModelDNA, SkinToneSwatch } from '../shared/types.ts';
 
 function rgbToHex(r: number, g: number, b: number): string {
@@ -167,7 +167,7 @@ register('casting.expressions', async (p) => {
 
 export function createModel(projectId: string, name: string, dna: ModelDNA) {
   const id = uid('md_');
-  const arch = SUPERMODEL_ARCHETYPES.find(
+  const arch = getArchetype(dna.archetype_id || name) || SUPERMODEL_ARCHETYPES.find(
     (a) => a.id === dna.archetype_id || a.id === name || a.name === dna.archetype_id,
   );
   const mergedDna: ModelDNA = {

@@ -11,21 +11,21 @@
     "start": "tsx server/index.ts",
     "smoke": "tsx scripts/smoke.ts",
     "check:qa": "tsx scripts/qa-delivery-check.ts",
-    "check:variants": "tsx scripts/variant-reference-check.ts"
+    "check:variants": "tsx scripts/variant-reference-check.ts",
+    "check:consolidation": "tsx scripts/consolidation-check.ts"
   },
-
   "dependencies": {
     "@google/genai": "^0.14.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "multer": "^1.4.5-lts.1",
-    "sharp": "^0.33.5"
+    "multer": "^2.5.0",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/multer": "^1.4.12",
+    "@types/multer": "^2.3.0",
     "@types/node": "^22.7.5",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
