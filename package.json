@@ -11,7 +11,8 @@
     "start": "tsx server/index.ts",
     "smoke": "tsx scripts/smoke.ts",
     "check:qa": "tsx scripts/qa-delivery-check.ts",
-    "check:variants": "tsx scripts/variant-reference-check.ts"
+    "check:variants": "tsx scripts/variant-reference-check.ts",
+    "check:consolidation": "tsx scripts/consolidation-check.ts"
   },
   "dependencies": {
     "@google/genai": "^0.14.0",

@@ -1,7 +1,9 @@
 import type { GarmentDNA, ModelDNA, ReferenceManifestEntry } from '../shared/types.ts';
+import { validateExactModeConfig } from '../server/gates.ts';
 
 import {
   SUPERMODEL_ARCHETYPES,
+  getArchetype,
   EXPRESSIONS_PANEL_LIST,
   STYLE_PRESETS,
   SKELETAL_POSE_PRESETS,
@@ -30,7 +32,7 @@ export function castingPrompt(
   dna: ModelDNA,
   opts: { panel?: boolean; expressions?: boolean } = {},
 ) {
-  const arch = SUPERMODEL_ARCHETYPES.find(
+  const arch = getArchetype(dna?.archetype_id) || SUPERMODEL_ARCHETYPES.find(
     (a) => a.id === dna?.archetype_id || a.name === dna?.archetype_id,
   );
   const dnaLine = Object.entries(dna || {})
@@ -174,6 +176,10 @@ function formatReferenceManifest(manifest?: ReferenceManifestEntry[]): Record<st
       map[label] = `Asset ${ref.assetId} (${ref.type}, variant:${ref.variantId || 'base'}, sha256:${ref.sha256.slice(0, 12)}) — AUXILIARY_PREVIOUS_RENDER_SUPPORT: prior render to correct; preserve framing/pose while restoring 1:1 fidelity from the original garment photographs and identity sheet.`;
     } else if (ref.role === 'pose_source_support') {
       map[label] = `Asset ${ref.assetId} (${ref.type}, variant:${ref.variantId || 'base'}, sha256:${ref.sha256.slice(0, 12)}) — AUXILIARY_POSE_SOURCE_SUPPORT: source render for pose adjustment; never overrides identity_sheet or garment_original references.`;
+    } else if (ref.role === 'background_support') {
+      map[label] = `Asset ${ref.assetId} (${ref.type}, sha256:${ref.sha256.slice(0, 12)}) — EXPLICIT_CUSTOM_BACKGROUND: source backdrop to composite the subject and garment onto seamlessly with matching ambient lighting and contact shadows.`;
+    } else if (ref.role === 'target_support') {
+      map[label] = `Asset ${ref.assetId} (${ref.type}, sha256:${ref.sha256.slice(0, 12)}) — TARGET_SCENE_REFERENCE: source for garment styling, pose, perspective, scale, lighting and camera angle. NEVER transfer identity, face, makeup, jewelry or skin marks from this target to the avatar.`;
     }
   }
   map.ZERO_CROSS_CONTAMINATION =
@@ -189,6 +195,7 @@ const textureDesc = (v: number) =>
   v < 35 ? 'smooth fine surface' : v < 70 ? 'clearly visible weave structure' : 'micro-HD thread and fiber texture';
 
 export function tryOnPrompt(lock: GarmentDNA, params: RenderParams = {}) {
+  validateExactModeConfig(params);
   const stylePreset = STYLE_PRESETS.find((s) => s.id === params.stylePresetId);
   const posePreset = SKELETAL_POSE_PRESETS.find((p) => p.id === params.posePresetId);
   const bgPreset = BACKGROUND_PRESETS.find((b) => b.id === params.backgroundPresetId) || BACKGROUND_PRESETS[0];

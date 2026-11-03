@@ -205,9 +205,21 @@ export function resolveLockSources(productId: string, variantId?: string | null,
 
 }
 
-export function createLock(productId: string, sourceAssetIds?: string[], variantId?: string | null) {
-  const cleanVariantId = variantId ? String(variantId).trim() : null;
-  const resolvedIds = resolveLockSources(productId, cleanVariantId, sourceAssetIds);
+export function createLock(
+  productId: string,
+  sourceAssetIds?: string[] | { sourceAssetIds?: string[]; variantId?: string | null },
+  variantId?: string | null,
+) {
+  let explicitIds: string[] | undefined;
+  let vId = variantId;
+  if (sourceAssetIds && !Array.isArray(sourceAssetIds) && typeof sourceAssetIds === 'object') {
+    explicitIds = (sourceAssetIds as any).sourceAssetIds;
+    vId = (sourceAssetIds as any).variantId;
+  } else if (Array.isArray(sourceAssetIds)) {
+    explicitIds = sourceAssetIds;
+  }
+  const cleanVariantId = vId ? String(vId).trim() : null;
+  const resolvedIds = resolveLockSources(productId, cleanVariantId, explicitIds);
   const prevVersion = get<any>(
     `SELECT MAX(version) AS v FROM locks WHERE product_id=? AND COALESCE(variant_id, '') = COALESCE(?, '')`,
     [productId, cleanVariantId],

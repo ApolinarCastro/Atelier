@@ -526,3 +526,88 @@ th {
   border-color: var(--acc);
   background: var(--acc-soft);
 }
+
+/* F02: Comparador Visual Cortina y Lado a Lado */
+.comparator-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 5, 8, 0.88);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.comparator-box {
+  background: var(--panel);
+  border: 1px solid var(--line-bright);
+  border-radius: 14px;
+  width: 92vw;
+  max-width: 1040px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.85);
+}
+
+.comparator-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.comparator-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.split-slider-container {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  height: 600px;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid var(--line-bright);
+  user-select: none;
+}
+
+.split-slider-container img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.split-slider-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--acc);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.6);
+  cursor: ew-resize;
+}
+
+.badge-exact {
+  background: rgba(52, 211, 153, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: var(--ok);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

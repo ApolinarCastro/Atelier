@@ -3,7 +3,7 @@ import { register } from '../server/queue.ts';
 import { generateImage } from '../server/provider.ts';
 import { tryOnPrompt, viewPrompt, ghostPrompt, buildCorrectiveRetryPrompt, poseStudioPrompt } from './prompts.ts';
 import { createAsset, assetImage, getAsset } from './assets.ts';
-import { GateError, requireApprovedLock, requireApprovedModel } from '../server/gates.ts';
+import { GateError, requireApprovedLock, requireApprovedModel, validateExactModeConfig } from '../server/gates.ts';
 import { fingerprint } from '../server/qa-evidence.ts';
 import type { GarmentDNA, AssetType, Asset, ReferenceManifestEntry } from '../shared/types.ts';
 
@@ -68,6 +68,18 @@ function loadLock(lockId: string, expectedVariantId?: string | null, expectedPro
   return { lock, dna, originals, cut, product: prod };
 }
 
+function appendBackgroundIfPresent(
+  refItems: { asset: Asset; role: ReferenceManifestEntry['role'] }[],
+  bgId?: string,
+) {
+  if (!bgId) return;
+  const bg = getAsset(bgId);
+  if (!bg || (bg.type !== 'background_custom' && bg.type !== 'garment_raw')) {
+    throw new GateError('BACKGROUND_NOT_FOUND', 'Fondo personalizado no encontrado');
+  }
+  refItems.push({ asset: bg, role: 'background_support' });
+}
+
 async function assembleProviderReferences(items: {
   asset: Asset;
   role: ReferenceManifestEntry['role'];
@@ -106,11 +118,13 @@ register('render.tryon', async (p) => {
   const { dna, originals, cut, lock } = loadLock(p.lockId, p.variantId ?? null, p.productId, p.projectId);
   const variant = loadVariant(p.variantId ?? lock.variant_id ?? undefined, lock.product_id, p.projectId);
 
+  validateExactModeConfig(p.params);
   const refItems: { asset: Asset; role: ReferenceManifestEntry['role'] }[] = [
     { asset: sheetAsset, role: 'identity_sheet' },
     ...originals.map((orig) => ({ asset: orig, role: 'garment_original' as const })),
     ...(cut ? [{ asset: cut, role: 'garment_cut_support' as const }] : []),
   ];
+  appendBackgroundIfPresent(refItems, p.params?.backgroundAssetId);
   const { images, manifest } = await assembleProviderReferences(refItems);
 
   const params = p.params || {};
@@ -155,11 +169,13 @@ register('render.view', async (p) => {
   const { dna, originals, cut, lock } = loadLock(p.lockId, p.variantId ?? null, p.productId, p.projectId);
   const variant = loadVariant(p.variantId ?? lock.variant_id ?? undefined, lock.product_id, p.projectId);
 
+  validateExactModeConfig(p.params);
   const refItems: { asset: Asset; role: ReferenceManifestEntry['role'] }[] = [
     { asset: sheetAsset, role: 'identity_sheet' },
     ...originals.map((orig) => ({ asset: orig, role: 'garment_original' as const })),
     ...(cut ? [{ asset: cut, role: 'garment_cut_support' as const }] : []),
   ];
+  appendBackgroundIfPresent(refItems, p.params?.backgroundAssetId);
   const { images, manifest } = await assembleProviderReferences(refItems);
 
   const g = await generateImage({

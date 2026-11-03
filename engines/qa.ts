@@ -93,7 +93,7 @@ register('qa.evaluate', async (p) => {
   if (JSON.stringify(evidence) !== JSON.stringify(qaEvidence(getAsset(candidate.id)!))) {
     throw new GateError('QA_STALE', 'El candidato o las referencias cambiaron durante la evaluación');
   }
-  const overallStatus = passesQA(report, Boolean(evidence.sheet)) && opticalMetrics.resolutionOk ? 'PASS' : 'FAIL';
+  const overallStatus = passesQA(report, Boolean(evidence.sheet), candidate.type) && opticalMetrics.resolutionOk ? 'PASS' : 'FAIL';
   const result = { ...report, overallStatus, opticalMetrics, evidence, mode, evaluationId: uid('qa_') };
   const values = Object.values(report.attributes);
   const score = values.filter(value => value === 'MATCH').length / values.length;

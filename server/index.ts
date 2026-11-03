@@ -6,10 +6,12 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { CONFIG, isMock, updateRuntimeConfig } from './config.ts';
 import { all, get, run, tx, uid, now, audit } from './db.ts';
-import { enqueueAndWait, jobStats } from './queue.ts';
-import { GateError, requireApprovedAsset, requireProject } from './gates.ts';
+import { enqueue, enqueueAndWait, jobStats } from './queue.ts';
+import { GateError, requireApprovedAsset, requireApprovedModel, requireProject } from './gates.ts';
 import { createZipBuffer, resolveAssetFile } from './storage.ts';
 import { chatFashionAdvisor } from './provider.ts';
+import { STUDIO_BACKGROUND_PRESETS } from '../shared/catalog.ts';
+import type { Asset } from '../shared/types.ts';
 import {
   createModel, extractBiometricSkinPalette, ingestProduct, ingestProductFromUrl, generateProductScript,
   addVariant, assignRawAssetVariant, uploadProductReference, createLock, approveLock, approveAsset, getAsset, createAsset,
@@ -246,6 +248,38 @@ app.post('/api/models/:id/approve', wrap(async (req, res) => {
   res.json({ ok: true, model: get(`SELECT * FROM models WHERE id=?`, [m.id]) });
 }));
 
+// F04: Biblioteca global de identidades y reutilización entre proyectos
+app.get('/api/models/library', wrap(async (_req, res) => {
+  const models = all<any>(`
+    SELECT m.*, p.name as project_name, a.file_path as sheet_file_path
+    FROM models m
+    LEFT JOIN projects p ON m.project_id = p.id
+    LEFT JOIN assets a ON m.sheet_asset_id = a.id
+    WHERE m.status = 'approved' AND m.sheet_asset_id IS NOT NULL
+    ORDER BY m.created_at DESC
+  `);
+  res.json(models);
+}));
+
+app.post('/api/projects/:id/models/import', wrap(async (req, res) => {
+  const projectId = req.params.id;
+  requireProject(projectId);
+  const { sourceModelId } = req.body || {};
+  if (!sourceModelId) return res.status(400).json({ error: 'sourceModelId requerido' });
+  const sourceModel = get<any>(`SELECT * FROM models WHERE id=?`, [sourceModelId]);
+  if (!sourceModel || sourceModel.status !== 'approved' || !sourceModel.sheet_asset_id) {
+    return res.status(404).json({ error: 'Modelo fuente aprobado no encontrado' });
+  }
+  const newId = uid('md_');
+  run(
+    `INSERT INTO models(id, project_id, name, dna_json, sheet_asset_id, status, created_at)
+     VALUES(?,?,?,?,?,'approved',?)`,
+    [newId, projectId, sourceModel.name, sourceModel.dna_json, sourceModel.sheet_asset_id, now()],
+  );
+  audit('model', newId, 'import', { sourceModelId, projectId });
+  res.json({ model: get(`SELECT * FROM models WHERE id=?`, [newId]) });
+}));
+
 // ---- Etapa 2: intake (Archivo + Extractor URL E-Commerce + Guión Estilista)
 app.post('/api/projects/:id/products', upload.single('file'), wrap(async (req, res) => {
   const projectId = req.params.id;
@@ -466,6 +500,137 @@ app.post('/api/assets/:id/qa', wrap(async (req, res) => {
 
 app.post('/api/assets/:id/approve', wrap(async (req, res) => {
   res.json({ asset: approveAsset(req.params.id, false) });
+}));
+
+// F02: Historial de versiones y comparador lado a lado / cortina deslizable
+app.get('/api/assets/:id/versions', wrap(async (req, res) => {
+  const asset = getAsset(req.params.id);
+  if (!asset) return res.status(404).json({ error: 'Asset no encontrado' });
+  const versions = all<Asset>(
+    `SELECT * FROM assets
+     WHERE project_id=? AND (id=? OR parent_asset_id=? OR (product_id=? AND (variant_id IS ? OR variant_id=?)))
+       AND stage IN ('rendered', 'qa', 'approved')
+     ORDER BY created_at DESC`,
+    [asset.project_id, asset.id, asset.id, asset.product_id || null, asset.variant_id ?? null, asset.variant_id ?? null],
+  );
+  res.json({ current: asset, versions });
+}));
+
+// F01: Biblioteca y carga de fondos personalizados
+app.get('/api/backgrounds', wrap(async (_req, res) => {
+  const custom = all<Asset>(`SELECT * FROM assets WHERE type='background_custom' ORDER BY created_at DESC`);
+  res.json({ presets: STUDIO_BACKGROUND_PRESETS, custom });
+}));
+
+app.post('/api/projects/:id/backgrounds', upload.single('file'), wrap(async (req, res) => {
+  const projectId = req.params.id;
+  requireProject(projectId);
+  if (!req.file) return res.status(400).json({ error: 'Falta la imagen de fondo' });
+  const asset = await createAsset({
+    projectId,
+    type: 'background_custom',
+    stage: 'draft',
+    buffer: req.file.buffer,
+  });
+  res.json({ asset });
+}));
+
+// F03: Procesamiento por lotes por SKU con idempotencia y límites
+app.post('/api/projects/:id/batches', wrap(async (req, res) => {
+  const projectId = req.params.id;
+  requireProject(projectId);
+  const { skus = [], productIds = [], modelId, modes = ['tryon'], params = {}, idempotencyKey } = req.body || {};
+  if (!modelId) return res.status(400).json({ error: 'modelId requerido' });
+  requireApprovedModel(modelId);
+
+  let products = all<any>(`SELECT * FROM products WHERE project_id=?`, [projectId]);
+  if (Array.isArray(productIds) && productIds.length) {
+    products = products.filter((p) => productIds.includes(p.id));
+  } else if (Array.isArray(skus) && skus.length) {
+    products = products.filter((p) => skus.includes(p.title) || skus.includes(p.id));
+  }
+
+  if (!products.length) return res.status(404).json({ error: 'No se encontraron prendas para procesar' });
+  if (products.length * modes.length > 50) {
+    return res.status(400).json({ error: 'El lote excede el límite máximo de 50 trabajos simultáneos' });
+  }
+
+  const batchId = uid('batch_');
+  const items: any[] = [];
+
+  for (const product of products) {
+    const lock = get<any>(
+      `SELECT * FROM locks WHERE product_id=? AND approved=1 ORDER BY created_at DESC LIMIT 1`,
+      [product.id],
+    );
+    if (!lock) {
+      items.push({
+        sku: product.title,
+        productId: product.id,
+        status: 'blocked',
+        error: 'Sin Garment Lock aprobado para la prenda',
+      });
+      continue;
+    }
+
+    for (const mode of modes) {
+      const jobType = mode === 'ghost' ? 'render.ghost' : 'render.tryon';
+      const job = enqueue(jobType, projectId, {
+        projectId,
+        productId: product.id,
+        modelId,
+        lockId: lock.id,
+        params: { ...params, batchId, idempotencyKey },
+      });
+      items.push({
+        sku: product.title,
+        productId: product.id,
+        mode,
+        jobId: job.id,
+        status: 'queued',
+      });
+    }
+  }
+
+  audit('batch', batchId, 'created', { total: items.length, items });
+  res.json({ batchId, total: items.length, items });
+}));
+
+app.get('/api/projects/:id/batches/:batchId', wrap(async (req, res) => {
+  const { id: projectId, batchId } = req.params;
+  const jobs = all<any>(
+    `SELECT * FROM jobs WHERE project_id=? AND input_json LIKE ? ORDER BY created_at DESC`,
+    [projectId, `%"batchId":"${batchId}"%`],
+  );
+
+  let completed = 0, failed = 0, queued = 0, running = 0;
+  for (const j of jobs) {
+    if (j.status === 'done') completed++;
+    else if (j.status === 'failed') failed++;
+    else if (j.status === 'running') running++;
+    else queued++;
+  }
+
+  res.json({
+    batchId,
+    projectId,
+    total: jobs.length,
+    completed,
+    failed,
+    running,
+    queued,
+    jobs,
+  });
+}));
+
+app.post('/api/batches/:batchId/cancel', wrap(async (req, res) => {
+  const { batchId } = req.params;
+  const updated = run(
+    `UPDATE jobs SET status='cancelled', error='Cancelado por el operador'
+     WHERE status IN ('queued', 'running') AND input_json LIKE ?`,
+    [`%"batchId":"${batchId}"%`],
+  );
+  res.json({ ok: true, batchId, cancelledJobs: updated.changes });
 }));
 
 // ---- Etapa 6: compose (Plantillas Haute Couture + Detección Anatómica + Auditoría SHA-256) + export

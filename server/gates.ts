@@ -85,7 +85,7 @@ export function requireAssetApprovable(assetId: string, _strictRenderQA = true) 
     const evidence = qaEvidence(asset);
     if (JSON.stringify(qa.evidence) !== JSON.stringify(evidence))
       throw new GateError('QA_STALE', 'El candidato o las referencias cambiaron');
-    if (!passesQA(validateQA(qa, Boolean(evidence.sheet)), Boolean(evidence.sheet)) || qa.opticalMetrics?.resolutionOk !== true)
+    if (!passesQA(validateQA(qa, Boolean(evidence.sheet)), Boolean(evidence.sheet), asset.type) || qa.opticalMetrics?.resolutionOk !== true)
       throw new GateError('ASSET_QA_FAILED', 'El render requiere un PASS completo');
   }
   if (asset.type === 'composed') {
@@ -123,4 +123,31 @@ export function requireProject(projectId: string) {
   const project = get('SELECT * FROM projects WHERE id=?', [projectId]);
   if (!project) throw new GateError('PROJECT_NOT_FOUND', 'El proyecto no existe');
   return project;
+}
+
+/** Contrato de Validación de Modo Exacto (R02) */
+export function validateExactModeConfig(input: any): void {
+  if (!input) return;
+  const p = input.params || input;
+  const mode = input.generationMode || p.generationMode || (input.exactMode || p.exactMode ? 'exact' : 'editorial_preset');
+  if (mode === 'exact') {
+    const forbiddenKeys = [
+      'hairColorOverride',
+      'eyeColorOverride',
+      'skinToneOverride',
+      'expressionOverride',
+      'makeupOverride',
+      'anatomyOverride',
+      'footwearOverride',
+    ];
+    for (const key of forbiddenKeys) {
+      const val = p[key] ?? input[key];
+      if (val !== undefined && val !== null && String(val).trim() !== '' && String(val).toLowerCase() !== 'default') {
+        throw new GateError(
+          'EXACT_MODE_OVERRIDE_FORBIDDEN',
+          `El modo Exacto prohíbe overrides de identidad o anatomía (${key}="${val}"). El Avatar es la fuente exclusiva inmutable de rasgos personales y el Target es la fuente exclusiva de prenda y pose.`,
+        );
+      }
+    }
+  }
 }
