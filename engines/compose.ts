@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import sharp from 'sharp';
+import sharp, { type OverlayOptions } from 'sharp';
 import { run, now } from '../server/db.ts';
 import { register } from '../server/queue.ts';
 import { requireApprovedAsset, GateError } from '../server/gates.ts';
@@ -148,7 +148,7 @@ register('compose.catalog', async (p) => {
   const innerW = W - safeMargin * 2;
   const innerH = H - safeMargin * 2;
 
-  const layers: sharp.OverlayOptions[] = [];
+  const layers: OverlayOptions[] = [];
   const landmarksReport: Record<string, SubjectLandmarks> = {};
 
   if (hcTemplate) {

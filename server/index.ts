@@ -62,7 +62,11 @@ app.use('/api', (req, res, next) => {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: {
+    fileSize: 25 * 1024 * 1024,
+    files: 1,
+    fields: 15,
+  },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_MIMES.has(file.mimetype)) {
       return cb(new Error('Formato de archivo no soportado. Usa PNG, JPG o WEBP.'));
